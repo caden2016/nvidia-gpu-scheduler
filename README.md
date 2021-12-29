@@ -3,7 +3,7 @@ English | [简体中文](./README-zh_CN.md)
 ## Table of Contents
 
 - [Introduction](#Introduction)
-- [Features and Components](#Features and Components)
+- [Features and Components](#Features-and-Components)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Building and Running Locally](#building-and-running-locally)
