@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nvidia-gpu-scheduler.fullname" . }}
+  labels:
+    {{- include "nvidia-gpu-scheduler.labels" . | nindent 4 }}
+spec:
+  # gpuserver now only support one instance.
+  serviceName: {{ include "nvidia-gpu-scheduler.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nvidia-gpu-scheduler.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nvidia-gpu-scheduler.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nvidia-gpu-scheduler.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          env:
+          - name: MetadataName
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: MetadataNamespace
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.gpuserver.repository }}:{{ .Values.image.gpuserver.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.gpuserver.pullPolicy }}
+          ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+          # mount local time
+          volumeMounts:
+          - mountPath: /etc/localtime
+            name: localtime
+            readOnly: true
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 2
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 2
+          tty: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

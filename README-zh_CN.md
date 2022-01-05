@@ -12,7 +12,7 @@
 
 ## 介绍
 
-在英伟达官方k8s插件 [NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin#readme) 的帮助下，我们可以通过pod请求固定数目的gpu并自动调度到拥有足够请求gpu数目的节点上。但是在某种场景下，比如我们不同的节点有多个类型的gpu。这种情况下我们希望pod（需要2个x类型的gpu）能够自动调度到满足请求类型和个数的节点上。[nvidia-gpu-scheduler](https://github.com/caden2016/nvidia-gpu-scheduler/blob/master/README.md) 可以实现该场景的需求并提供了基于pod内部容器粒度的gpu使用监控和节点gpu信息查询接口。 
+在英伟达官方k8s插件 [NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin#readme) 的帮助下，我们可以通过pod请求固定数目的gpu并自动调度到拥有足够请求gpu数目的节点上。但是在某种场景下，比如我们不同的节点有多个类型的gpu。这种情况下我们希望pod（需要2个x类型的gpu）能够自动调度到满足请求类型和个数的节点上。[nvidia-gpu-scheduler](https://github.com/caden2016/nvidia-gpu-scheduler/blob/master/README.md) 可以实现该场景的需求并提供了基于pod内部容器粒度的gpu使用监控和节点gpu信息查询接口。
 
 ## 特征和组件
 ### 特征
@@ -21,7 +21,7 @@
 - 调度扩展点：Filter,Score,Preempt。（对请求pod注解包含 `nvidia.com/gpu.model`，过滤不符合gpu类型的节点。对每种gpu类型的节点按照gpu个数打分进行优选。）
 ### 组件
 The NVIDIA device scheduler extender for Kubernetes contains a StatefulSet (gpuserver) and a Daemonset (gpuserver-ds):
-#### gpuserver 
+#### gpuserver
 提供以下接口来监控请求gpu的pod和gpu节点的信息：
 * GET /apis/metrics.nvidia.com/v1alpha1/podresources
 * GET /apis/metrics.nvidia.com/v1alpha1/podresources?watch=true
@@ -39,7 +39,7 @@ The NVIDIA device scheduler extender for Kubernetes contains a StatefulSet (gpus
 > **_注意：_** **如果确保你的集群每个节点只有一种gpu类型网卡，不必执行以下扩展。如果你的集群节点拥有多种类型的gpu设备。为了让调度到节点的pod分配到所需类型的gpu设备，必须进行以下扩展。**
 - 原始的kubernetes kubelet组件并不支持调度不同gpu类型的pod，需要进行扩展。
 - 原始的[NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin#readme) 并没采集gpu类型信息，需要修改[kubelet deviceplugin API](https://github.com/kubernetes/kubelet/blob/master/pkg/apis/deviceplugin/v1beta1/api.proto) 扩展传递给kubelet的gpu信息。
-   
+
 ## 先决条件
 
 运行NVIDIA device scheduler extender的先决条件列表如下：
@@ -83,9 +83,9 @@ profiles:
 # helm repo add ngs https://caden2016.github.io/nvidia-gpu-scheduler
 # helm repo update
 ```
-* 通过helm仓库安装指定版本应用。xxx为应用实例名称。
+* 通过helm仓库安装指定版本应用。xxx为应用实例名称。nodeinfo=gpu为gpuserver-ds部署到gpu节点上的label。
 ```shell
-# helm install xxx ngs/nvidia-gpu-scheduler --version 0.1.0 --namespace kube-system
+# helm install xxx ngs/nvidia-gpu-scheduler --version 0.1.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
 # helm  list --namespace kube-system
 ```
 ## 本地构建和运行

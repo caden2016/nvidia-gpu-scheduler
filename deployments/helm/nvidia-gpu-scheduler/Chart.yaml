@@ -1,0 +1,8 @@
+apiVersion: v2
+name: nvidia-gpu-scheduler
+description: A Helm chart for nvidia-gpu-scheduler on Kubernetes
+type: application
+version: "0.1.0"
+kubeVersion: ">= 1.13.0-0"
+appVersion: "0.1.0"
+home: https://github.com/caden2016/nvidia-gpu-scheduler

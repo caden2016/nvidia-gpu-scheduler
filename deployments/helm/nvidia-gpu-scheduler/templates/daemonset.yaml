@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "nvidia-gpu-scheduler.fullname" . }}
+  labels:
+    {{- include "nvidia-gpu-scheduler.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "nvidia-gpu-scheduler.ds.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nvidia-gpu-scheduler.ds.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nvidia-gpu-scheduler.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          env:
+          - name: NODENAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: MetadataName
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: MetadataNamespace
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.gpuserverds.repository }}:{{ .Values.image.gpuserverds.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.gpuserverds.pullPolicy }}
+          # mount local time
+          volumeMounts:
+          - mountPath: /etc/localtime
+            name: localtime
+            readOnly: true
+          - name: pod-gpu-resources
+            readOnly: true
+            mountPath: {{ .Values.defaultPodResourcesDir }}
+          tty: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      - name: pod-gpu-resources
+        hostPath:
+          path: {{ .Values.defaultPodResourcesDir }}
+      {{- with .Values.nodeSelectorDaemonSet }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

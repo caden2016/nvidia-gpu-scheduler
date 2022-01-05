@@ -1,0 +1,10 @@
+bind-address: 127.0.0.1
+secure-port: 8081
+tls-auto: true
+enable-scheduler: true
+tls-config:
+  tls-ca-file: ./ssl/ca-cert.pem
+  tls-cert-file: ./ssl/cert.pem
+  tls-private-key-file: ./ssl/key.pem
+scheduler:
+  parallelism: 10
