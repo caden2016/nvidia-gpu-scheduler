@@ -2,8 +2,20 @@ apiVersion: v1
 entries:
   nvidia-gpu-scheduler:
   - apiVersion: v2
+    appVersion: 0.2.0
+    created: "2022-02-21T14:53:47.2912561+08:00"
+    description: A Helm chart for nvidia-gpu-scheduler on Kubernetes
+    digest: c51fe8ecdaec8e90eabf493b296b55028bce2438922c36fae049ad5ade7ab5ac
+    home: https://caden2016.github.io/nvidia-gpu-scheduler
+    kubeVersion: '>= 1.13.0-0'
+    name: nvidia-gpu-scheduler
+    type: application
+    urls:
+    - https://caden2016.github.io/nvidia-gpu-scheduler/stable/nvidia-gpu-scheduler-0.2.0.tgz
+    version: 0.2.0
+  - apiVersion: v2
     appVersion: 0.1.0
-    created: "2022-01-05T11:24:05.1051324+08:00"
+    created: "2022-02-21T14:53:47.2873998+08:00"
     description: A Helm chart for nvidia-gpu-scheduler on Kubernetes
     digest: 40e27994c5a58d205d9854c1eb56ec8e1c7b1b2c3a5000ee5836cecaae62fe95
     home: https://github.com/caden2016/nvidia-gpu-scheduler
@@ -13,4 +25,4 @@ entries:
     urls:
     - https://caden2016.github.io/nvidia-gpu-scheduler/stable/nvidia-gpu-scheduler-0.1.0.tgz
     version: 0.1.0
-generated: "2022-01-05T11:24:05.0992916+08:00"
+generated: "2022-02-21T14:53:47.2784751+08:00"

@@ -28,12 +28,12 @@ myrepo	https://caden2016.github.io/nvidia-gpu-scheduler
 ```bash
 # helm search repo myrepo
 NAME                              	CHART VERSION	APP VERSION	DESCRIPTION                                            
-myrepo/nvidia-gpu-scheduler       	0.1.0        	0.1.0      	A Helm chart for nvidia-gpu-scheduler on Kubernetes 
+myrepo/nvidia-gpu-scheduler       	0.2.0        	0.2.0      	A Helm chart for nvidia-gpu-scheduler on Kubernetes 
 ```
 
 4. 安装chart包，xxx为relaese名字，nodeinfo=gpu为gpuserver-ds部署到gpu节点上的label。
 ```bash
-# helm install xxx myrepo/nvidia-gpu-scheduler --version 0.1.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
+# helm install xxx myrepo/nvidia-gpu-scheduler --version 0.2.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
 # helm  list --all-namespaces
 # helm uninstall xxx --namespace kube-system
 ```
