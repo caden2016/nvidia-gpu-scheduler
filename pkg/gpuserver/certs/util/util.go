@@ -2,18 +2,19 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util/info/metadata"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"github.com/openkruise/kruise/pkg/webhook/util/writer"
-	"io/ioutil"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
 func InitializeCert(kubeClient kubernetes.Interface) (*generator.Artifacts, error) {
-	name, namespace, dnsName := util.GetServiceCommonName()
+	name, namespace, dnsName := metadata.MetadataName(), metadata.MetadataNamespace(), metadata.ServiceName()
 	klog.Infof("generating cert with dnsName:%s", dnsName)
 
 	certWriter, err := writer.NewSecretCertWriter(writer.SecretCertWriterOptions{

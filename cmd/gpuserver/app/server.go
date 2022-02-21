@@ -4,19 +4,25 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util/signal"
+
+	"k8s.io/client-go/rest"
+
+	gpuclientset "github.com/caden2016/nvidia-gpu-scheduler/pkg/generated/gpunode/clientset/versioned"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
 	certsutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/certs/util"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/controller"
 	routerinit "github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/router/init"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util"
 	serverutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/util/server"
 	"github.com/gorilla/mux"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"net/http"
-	"time"
 )
 
 func runserver(sflags *options.MetricsPodResourceFlags) (err error) {
@@ -24,16 +30,19 @@ func runserver(sflags *options.MetricsPodResourceFlags) (err error) {
 		return serverutil.LogOrWriteConfig(sflags.WriteConfigTo, sflags)
 	}
 	serverutil.DumpConfig(sflags)
-	stop, cancelFunc := util.SetupSignalHandler()
+	stopCtx, cancelFunc := signal.SetupSignalHandler()
 	defer cancelFunc()
+	stop := stopCtx.Done()
 
 	//initialize certs - auto or use files
 	var certs *generator.Artifacts
 	var aggregatorClient clientset.Interface
 	var kubeClient kubernetes.Interface
+	var gpuClient gpuclientset.Interface
+	var kubeconf *rest.Config
 	if sflags.TLSAuto {
 		klog.Infof("Generate certs for server automatically")
-		kubeClient, aggregatorClient, err = serverutil.GetKubeAndAggregatorClientset()
+		kubeconf, kubeClient, aggregatorClient, gpuClient, _, err = serverutil.GetKubeAndAggregatorClientset()
 		if err != nil {
 			return err
 		}
@@ -70,12 +79,11 @@ func runserver(sflags *options.MetricsPodResourceFlags) (err error) {
 		Handler: servermux,
 	}
 
-	// create and start node
-	nhc := controller.NewNodeHealthChecker(options.NodeHealthChecker_CheckInterval, options.NodeHealthChecker_NodeStatusTTL, stop)
-	nhc.Start()
+	// start gpunode reconctler controller ande gpunode lifecycle controller.
+	gpuMgrClient := controller.StartGpuManagerAndLifecycleControllerErrExit(stopCtx, kubeconf, kubeClient, gpuClient)
 
 	// create and start Main channel controller.
-	serverController, err := controller.NewServerController(nhc, sflags.Scheduler.Parallelism, stop)
+	serverController, err := controller.NewServerController(stop, sflags.Scheduler.Parallelism, gpuMgrClient)
 	if err != nil {
 		return err
 	}

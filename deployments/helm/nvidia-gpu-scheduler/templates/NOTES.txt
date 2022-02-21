@@ -1,6 +1,21 @@
 Try to manage gpu info with the following apis from the k8s kube-apiserver:
   1.monitoring gpu pod。
-    kubectl get --raw "/apis/metrics.nvidia.com/v1alpha1/podresources"
-    kubectl get --raw “/apis/metrics.nvidia.com/v1alpha1/podresources?watch=true”
+    kubectl get --raw "/apis/nvidia-gpu-scheduler/v1/gpupods?watch=true"
   2.monitoring gpu node.
-    kubectl get --raw "/apis/metrics.nvidia.com/v1alpha1/gpuinfos"
+    kubectl get --raw "/apis/nvidia-gpu-scheduler/v1/gpunodes?watch=true"
+  3.test demo with annotation in pod, nvidia-gpu-scheduler/gpu.model: tesla t4
+  # then the pod will be  scheduled to nodes which contains gpu with model tesla t4.
+  # if annotation not be set, will not affect the original schedule.
+  # if the gpuserver is down, will not affect the original schedule.
+  ```
+    template:
+      metadata:
+        annotations:
+          nvidia-gpu-scheduler/gpu.model: tesla t4
+        creationTimestamp: null
+        labels:
+          app: demo
+      spec:
+        containers:
+          - image: alpine:latest
+  ```

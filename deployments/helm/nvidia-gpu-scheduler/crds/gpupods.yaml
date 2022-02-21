@@ -1,0 +1,97 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: gpupods.resources.scheduler.caden2016.github.io
+spec:
+  group: resources.scheduler.caden2016.github.io
+  names:
+    kind: GpuPod
+    listKind: GpuPodList
+    plural: gpupods
+    singular: gpupod
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - description: The pod namespace.
+          jsonPath: .spec.pod_namespace
+          name: NAMESPACE
+          type: string
+        - description: The pod name.
+          jsonPath: .spec.pod_name
+          name: PODNAME
+          type: string
+        - description: The node name.
+          jsonPath: .spec.node_name
+          name: NODE
+          type: string
+        - description: The update time.
+          jsonPath: .status.last_changed_time
+          name: UPDATE
+          type: string
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: GpuPod is the Schema for the gpupods API
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: GpuPodSpec defines the desired state of GpuPod
+              properties:
+                containers_device:
+                  description: ContainerDevices is list of container name and gpu devices in each container.
+                  items:
+                    properties:
+                      container_name:
+                        type: string
+                      device_info:
+                        items:
+                          properties:
+                            device_brand:
+                              type: string
+                            device_busid:
+                              type: string
+                            device_id:
+                              type: string
+                            device_model:
+                              type: string
+                            device_node:
+                              type: string
+                          type: object
+                        type: array
+                    type: object
+                  type: array
+                node_name:
+                  type: string
+                pod_name:
+                  type: string
+                pod_namespace:
+                  type: string
+              type: object
+            status:
+              description: GpuPodStatus defines the observed state of GpuPod
+              properties:
+                last_changed_time:
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

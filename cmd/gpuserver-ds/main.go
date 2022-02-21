@@ -17,8 +17,6 @@ package main
 
 import "github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app"
 
-var version string // This should be set at build time to indicate the actual version
-
 func main() {
-	app.Execute(version)
+	app.Execute()
 }

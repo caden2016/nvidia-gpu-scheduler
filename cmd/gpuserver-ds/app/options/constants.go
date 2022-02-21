@@ -14,9 +14,9 @@ const (
 
 	PodWatcher_WATCH_RECONNECT_INTERVAL = time.Second
 
-	HostGpuInfoChecker_CheckInterval      = 2 * time.Second
-	HealthyChecker_WaitForServiceInterval = 5 * time.Second
-	HealthChecker_CheckHealthInterval     = 2 * time.Second
+	HostGpuInfoChecker_CheckInterval = 2 * time.Second
 
 	CaFromSecret_CheckInterval = time.Second
+
+	GPUPOD_ANNOTATION_TAG_Node = "nvidia-gpu-scheduler.node"
 )

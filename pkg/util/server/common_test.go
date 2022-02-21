@@ -1,35 +1,14 @@
 package server
 
 import (
-	"github.com/caden2016/nvidia-gpu-scheduler/api/jsonstruct"
+	"reflect"
+	"testing"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app/options"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/apis"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"reflect"
-	"testing"
 )
-
-func TestGetBusyDeviceSet(t *testing.T) {
-	type args struct {
-		prl []*jsonstruct.PodResourcesDetail
-	}
-	tests := []struct {
-		name string
-		args args
-		want sets.String
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := GetBusyDeviceSet(tt.args.prl); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetBusyDeviceSet() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func TestGetPodRequestGpuNum(t *testing.T) {
 	type args struct {
@@ -116,26 +95,6 @@ func TestMapSetToList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MapSetToList(tt.args.mapset); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MapSetToList() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestPodResourcesDetailToPodResource(t *testing.T) {
-	type args struct {
-		prdList []*jsonstruct.PodResourcesDetail
-	}
-	tests := []struct {
-		name string
-		args args
-		want []*apis.PodResource
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := PodResourcesDetailToPodResource(tt.args.prdList); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("PodResourcesDetailToPodResource() = %v, want %v", got, tt.want)
 			}
 		})
 	}

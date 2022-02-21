@@ -1,25 +1,27 @@
 package metricserver
 
 import (
+	"context"
 	"encoding/json"
-	. "github.com/caden2016/nvidia-gpu-scheduler/api/jsonstruct"
+	"net/http"
+	"path"
+	"reflect"
+	"runtime"
+	"strings"
+
+	gpunodev1 "github.com/caden2016/nvidia-gpu-scheduler/api/gpunode/v1"
+	gpupodv1 "github.com/caden2016/nvidia-gpu-scheduler/api/gpupod/v1"
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/apis"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/controller"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/router"
 	serverutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/util/server"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util/server/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schemeruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/klog"
-	"net/http"
-	"path"
-	"reflect"
-	"runtime"
-	"strings"
-	"time"
 )
 
 var (
@@ -44,18 +46,18 @@ func init() {
 	apiResourcesForDiscovery := make([]metav1.APIResource, 0, 2)
 	apiResourcesForDiscovery = append(apiResourcesForDiscovery,
 		metav1.APIResource{
-			Name:         options.RESOURCES,
-			SingularName: options.RESOURCE,
+			Name:         options.RESOURCES_GPUPOD,
+			SingularName: options.RESOURCE_GPUPOD,
 			Namespaced:   false,
-			Kind:         options.KIND,
-			Verbs:        metav1.Verbs([]string{"list", "watch"}),
+			Kind:         options.KIND_GPUPOD,
+			Verbs:        []string{"list", "watch"},
 		},
 		metav1.APIResource{
-			Name:         options.GPURESOURCES,
-			SingularName: options.GPURESOURCE,
+			Name:         options.RESOURCES_GPUNODE,
+			SingularName: options.RESOURCE_GPUNODE,
 			Namespaced:   false,
-			Kind:         options.GPUKIND,
-			Verbs:        metav1.Verbs([]string{"list"}),
+			Kind:         options.KIND_GPUNODE,
+			Verbs:        []string{"list", "watch"},
 		},
 	)
 
@@ -84,9 +86,10 @@ func (mr *metricsRouter) Routes() []router.Route {
 // initRoutes initializes the routes in metricsRouter.
 func (mr *metricsRouter) initRoutes() {
 	mr.routes = []router.Route{
+		router.NewGetRoute("/health", mr.getHealthHandler),
 		router.NewGetRoute(path.Join([]string{"/apis", options.APIGROUP, options.APIVERSION}...), mr.getVersionHandler),
-		router.NewGetRoute(path.Join([]string{"/apis", options.APIGROUP, options.APIVERSION, options.RESOURCES}...), mr.getResourceHandler),
-		router.NewGetRoute(path.Join([]string{"/apis", options.APIGROUP, options.APIVERSION, options.GPURESOURCES}...), mr.getGpuInfoHandler),
+		router.NewGetRoute(path.Join([]string{"/apis", options.APIGROUP, options.APIVERSION, options.RESOURCES_GPUPOD}...), mr.getGpuPodHandler),
+		router.NewGetRoute(path.Join([]string{"/apis", options.APIGROUP, options.APIVERSION, options.RESOURCES_GPUNODE}...), mr.getGpuNodeHandler),
 	}
 }
 
@@ -99,20 +102,22 @@ func (mr *metricsRouter) DumpRoutes() {
 	}
 }
 
+func (mr *metricsRouter) getHealthHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 func (mr *metricsRouter) getVersionHandler(w http.ResponseWriter, r *http.Request) {
 	versionHandler.ServeHTTP(w, r)
 }
 
-func (mr *metricsRouter) getResourceHandler(w http.ResponseWriter, r *http.Request) {
-
+func (mr *metricsRouter) getGpuPodHandler(w http.ResponseWriter, r *http.Request) {
 	// Watch will list first then continue watch.
 	if r.URL.Query().Get("watch") == "true" {
-		watchResultChan := make(chan *apis.Event, 10)
-		watchChan := make(chan *PodResourceUpdate)
+		watchResultChan := make(chan *watcher.GpuPodEvent, 10)
+		watchChan := make(chan interface{}, 1)
 
-		watch_uuid := mr.controller.AddWatcher(watchChan)
-		defer mr.controller.DelWatcher(watch_uuid)
-		klog.Infof("get watch uuid:%s", watch_uuid)
+		watchUuid := watcher.GpuPodWatcher.AddWatcher(watchChan)
+		klog.Infof("get watch uuid:%s", watchUuid)
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -130,103 +135,144 @@ func (mr *metricsRouter) getResourceHandler(w http.ResponseWriter, r *http.Reque
 		jsonenc := json.NewEncoder(w)
 
 		// add list result before watch signal arrives.
-		dataList := <-mr.controller.GetFromStore()
+
+		gpList := &gpupodv1.GpuPodList{}
+		if err := mr.controller.GpuMgrClient.List(context.TODO(), gpList); err != nil {
+			klog.Errorf("watch uuid:%s GpuMgrClient.List err:%v", watchUuid, err)
+		}
+
 		go func() {
-			for _, apipr := range serverutil.PodResourcesDetailToPodResource(dataList) {
-				watchResultChan <- &apis.Event{Type: apis.Synced, Object: apipr}
+			for _, gp := range gpList.Items {
+				watchResultChan <- watcher.NewGpuPodEvent(&gp, watcher.Synced)
 			}
 
 			//watchChan not stop until client disconnect.
-			for pru := range watchChan {
-				for _, apipr := range serverutil.PodResourcesDetailToPodResource(pru.PodResourcesSYNC) {
-					watchResultChan <- &apis.Event{Type: apis.Synced, Object: apipr}
-				}
-
-				for _, apipr := range pru.PodResourcesDEL {
-					watchResultChan <- &apis.Event{
-						Type: apis.Deleted,
-						Object: apis.NewPodResource(
-							&apis.PodResourceSpec{
-								Name:             apipr.Name,
-								Namespace:        apipr.Namespace,
-								ContainerDevices: nil,
-							},
-							&apis.PodResourceStatus{
-								LastChangedTime: time.Now().Format(time.RFC3339),
-							}),
-					}
-				}
+			for gpe := range watchChan {
+				watchResultChan <- gpe.(*watcher.GpuPodEvent)
 			}
 			// When ServerController clean all connections, we need to exit the LOOP goroutine.
 			close(watchResultChan)
-			klog.V(4).Infof("watch uuid:%s watchChan receive close signal and will be removed", watch_uuid)
+			klog.V(4).Infof("watch uuid:%s watchChan receive close signal and will be removed", watchUuid)
 		}()
 
 	LOOP:
 		for {
 			select {
 			case <-r.Context().Done():
-				klog.Infof("watch uuid:%s connection end from the client", watch_uuid)
+				klog.Infof("watch uuid:%s connection end from the client", watchUuid)
+				watcher.GpuPodWatcher.DelWatcher(watchUuid)
 				close(watchChan)
 				break LOOP
 
 			case wevent, ok := <-watchResultChan:
 				if ok {
 					if err := jsonenc.Encode(wevent); err != nil {
-						klog.Errorf("watch uuid:%s jsonenc.Encode err:%v", watch_uuid, err)
+						klog.Errorf("watch uuid:%s jsonenc.Encode err:%v", watchUuid, err)
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
 					flusher.Flush()
-					klog.V(4).Infof("watch uuid:%s data send", watch_uuid)
+					klog.V(4).Infof("watch uuid:%s data send", watchUuid)
 				} else {
 					//resultChan is closed
-					klog.Infof("watch uuid:%s closed", watch_uuid)
+					klog.Infof("watch uuid:%s closed", watchUuid)
 					break LOOP
 				}
 			}
 		}
 
-		klog.Infof("watch uuid:%s exit", watch_uuid)
+		klog.Infof("watch uuid:%s exit", watchUuid)
 		return
 	}
 
 	// Get just list the result.
-	select {
-	case data := <-mr.controller.GetFromStore():
-		apiprl := serverutil.PodResourcesDetailToPodResource(data)
-		prListOut := apis.NewList(len(apiprl))
-		for _, apipr := range apiprl {
-			prListOut.Items = append(prListOut.Items, apipr)
-		}
-
-		err := serverutil.WriteJSON(w, http.StatusOK, prListOut)
-		if err != nil {
-			klog.Errorf("WriteJSON Error: %v", err)
-		}
-		return
-	case <-time.After(5 * time.Second):
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
+	gpList := &gpupodv1.GpuPodList{}
+	if err := mr.controller.GpuMgrClient.List(context.TODO(), gpList); err != nil {
+		klog.Errorf("GpuMgrClient.List err:%v", err)
 	}
+	serverutil.WriteJSON(w, http.StatusOK, gpList)
 }
 
-func (mr *metricsRouter) getGpuInfoHandler(w http.ResponseWriter, _ *http.Request) {
-	ngiList := mr.controller.GetNodeGpuInfoMap().GetAllNodeGpuInfo()
-	ngiListOut := apis.NewList(len(ngiList))
-	for _, ngi := range ngiList {
-		nodeDeviceInUse := mr.controller.GetNodeGpuInfoMap().GetNodeDeviceInUse(ngi.NodeName)
-		nodestatus := mr.controller.NHC.GetNodeStatus(ngi.NodeName)
-		ngiListOut.Items = append(ngiListOut.Items, apis.NewGpuInfo(&apis.GpuInfoSpec{
-			NodeName:        ngi.NodeName,
-			GpuInfos:        ngi.GpuInfos,
-			Models:          serverutil.MapSetToList(ngi.Models),
-			ReportTime:      ngi.ReportTime,
-			NodeDeviceInUse: nodeDeviceInUse.List(),
-		}, serverutil.NodeStatusToGpuInfoStatus(nodestatus)))
+func (mr *metricsRouter) getGpuNodeHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Watch will list first then continue watch.
+	if r.URL.Query().Get("watch") == "true" {
+		watchResultChan := make(chan *watcher.GpuNodeEvent, 10)
+		watchChan := make(chan interface{}, 1)
+
+		watchUuid := watcher.GpuNodeWatcher.AddWatcher(watchChan)
+		klog.Infof("get watch uuid:%s", watchUuid)
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			klog.Errorf("w is not a http.Flusher")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Del("Content-Length")
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush() //chunked need return success head first
+
+		jsonenc := json.NewEncoder(w)
+
+		// add list result before watch signal arrives.
+
+		gpnList := &gpunodev1.GpuNodeList{}
+		if err := mr.controller.GpuMgrClient.List(context.TODO(), gpnList); err != nil {
+			klog.Errorf("watch uuid:%s GpuMgrClient.List err:%v", watchUuid, err)
+		}
+
+		go func() {
+			for _, gpn := range gpnList.Items {
+				watchResultChan <- watcher.NewGpuNodeEvent(&gpn, watcher.Synced)
+			}
+
+			//watchChan not stop until client disconnect.
+			for gpne := range watchChan {
+				watchResultChan <- gpne.(*watcher.GpuNodeEvent)
+			}
+			// When ServerController clean all connections, we need to exit the LOOP goroutine.
+			close(watchResultChan)
+			klog.V(4).Infof("watch uuid:%s watchChan receive close signal and will be removed", watchUuid)
+		}()
+
+	LOOP:
+		for {
+			select {
+			case <-r.Context().Done():
+				klog.Infof("watch uuid:%s connection end from the client", watchUuid)
+				watcher.GpuNodeWatcher.DelWatcher(watchUuid)
+				close(watchChan)
+				break LOOP
+
+			case wevent, ok := <-watchResultChan:
+				if ok {
+					if err := jsonenc.Encode(wevent); err != nil {
+						klog.Errorf("watch uuid:%s jsonenc.Encode err:%v", watchUuid, err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					flusher.Flush()
+					klog.V(4).Infof("watch uuid:%s data send", watchUuid)
+				} else {
+					//resultChan is closed
+					klog.Infof("watch uuid:%s closed", watchUuid)
+					break LOOP
+				}
+			}
+		}
+
+		klog.Infof("watch uuid:%s exit", watchUuid)
+		return
 	}
-	err := serverutil.WriteJSON(w, http.StatusOK, ngiListOut)
-	if err != nil {
-		klog.Errorf("WriteJSON Error: %v", err)
+
+	// Get just list the result.
+	gpnList := &gpunodev1.GpuNodeList{}
+	if err := mr.controller.GpuMgrClient.List(context.TODO(), gpnList); err != nil {
+		klog.Errorf("GpuMgrClient.List err:%v", err)
 	}
+	serverutil.WriteJSON(w, http.StatusOK, gpnList)
 }

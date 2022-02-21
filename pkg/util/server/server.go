@@ -8,20 +8,24 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
+	"k8s.io/client-go/tools/clientcmd"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
+	gpuclientset "github.com/caden2016/nvidia-gpu-scheduler/pkg/generated/gpunode/clientset/versioned"
+	gpupodclientset "github.com/caden2016/nvidia-gpu-scheduler/pkg/generated/gpupod/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"gopkg.in/yaml.v2"
-	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"net"
-	"net/http"
-	"os"
-	"time"
 )
 
 // GetTlsConfig get tls config with server config certs files.
@@ -38,19 +42,15 @@ func GetTlsConfig(certs *generator.Artifacts) (*tls.Config, error) {
 	}, nil
 }
 
-// GetListener get standard net Listener with server config and tls config.
-func GetListener(sflags *options.MetricsPodResourceFlags, cfg *tls.Config) (listener net.Listener, err error) {
-	listener, err = tls.Listen("tcp", fmt.Sprintf("%s:%d", sflags.BindAddress, sflags.BindPort), cfg)
-	return
-}
-
 // WriteJSON send back http stream, encode the value v with standard json encoding.
-func WriteJSON(w http.ResponseWriter, code int, v interface{}) error {
+func WriteJSON(w http.ResponseWriter, code int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	return enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		klog.Errorf("WriteJSON Error: %v", err)
+	}
 }
 
 func LogOrWriteConfig(fileName string, sflags interface{}) error {
@@ -79,34 +79,50 @@ func LogOrWriteConfig(fileName string, sflags interface{}) error {
 	return nil
 }
 
-func DumpConfig(sflags interface{}) error {
+func DumpConfig(sflags interface{}) {
 	outyaml, err := yaml.Marshal(sflags)
 	if err != nil {
-		return err
+		klog.Errorf("yaml.Marshal: %v", err)
+		return
 	}
 	buf := bytes.NewBuffer(outyaml)
 	klog.Info("Using server config", "\n-------------------------Configuration File Contents Start Here---------------------- \n", buf.String(), "\n------------------------------------Configuration File Contents End Here---------------------------------\n")
-	return nil
 }
 
-func GetKubeAndAggregatorClientset() (kubernetes.Interface, clientset.Interface, error) {
-	restconf, err := rest.InClusterConfig()
-	//restconf, err := clientcmd.BuildConfigFromFlags("", "/root/.kube/config")
+func GetKubeAndAggregatorClientset() (restconf *rest.Config, kubeClient kubernetes.Interface,
+	aggregatorClient clientset.Interface, gpuClient gpuclientset.Interface, gpuPodClient gpupodclientset.Interface, err error) {
+
+	_, errStat := os.Stat(clientcmd.RecommendedHomeFile)
+	if errStat != nil {
+		restconf, err = rest.InClusterConfig()
+	} else {
+		restconf, err = clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
+	}
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(restconf)
+	kubeClient, err = kubernetes.NewForConfig(restconf)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
-	aggregatorClient, err := clientset.NewForConfig(restconf)
+	aggregatorClient, err = clientset.NewForConfig(restconf)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
-	return kubeClient, aggregatorClient, nil
+	gpuClient, err = gpuclientset.NewForConfig(restconf)
+	if err != nil {
+		return
+	}
+
+	gpuPodClient, err = gpupodclientset.NewForConfig(restconf)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // EnsureAPIService ensure the apiservice.spec.caBundle is fresh
@@ -115,7 +131,7 @@ func EnsureAPIService(aggregatorClient clientset.Interface, cacert []byte) error
 	defer cancel()
 	apiserviceName := options.APIVERSION + "." + options.APIGROUP
 	base64str := base64.StdEncoding.EncodeToString(cacert)
-	patchBytes := []byte(fmt.Sprintf(`{"spec":{"caBundle":"%s","insecureSkipTLSVerify": false}}`, string(base64str)))
+	patchBytes := []byte(fmt.Sprintf(`{"spec":{"caBundle":"%s","insecureSkipTLSVerify": false}}`, base64str))
 	patchOpt := metav1.PatchOptions{FieldManager: options.CERT_Secret_Name}
 	_, err := aggregatorClient.ApiregistrationV1().APIServices().Patch(aggctx, apiserviceName, types.StrategicMergePatchType, patchBytes, patchOpt)
 	return err

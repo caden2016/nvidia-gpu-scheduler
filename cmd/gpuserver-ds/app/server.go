@@ -3,9 +3,8 @@ package app
 import (
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app/options"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver-ds/controller"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util"
 	serverutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/util/server"
-	serverdsutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/util/serverds"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util/signal"
 )
 
 func runserverds(sflags *options.MetricsPodResourceDSFlags) (err error) {
@@ -13,25 +12,19 @@ func runserverds(sflags *options.MetricsPodResourceDSFlags) (err error) {
 		return serverutil.LogOrWriteConfig(sflags.WriteConfigTo, sflags)
 	}
 	serverutil.DumpConfig(sflags)
-	stop, cancelFunc := util.SetupSignalHandler()
+	stopCtx, cancelFunc := signal.SetupSignalHandler()
 	defer cancelFunc()
-
-	hc := controller.NewHealthyChecker(sflags.IntervalWaitService, stop)
-
-	hc.CheckHealthBlock()
+	stop := stopCtx.Done()
 
 	gic, err := controller.NewHostGpuInfoChecker(options.HostGpuInfoChecker_CheckInterval, stop)
 	if err != nil {
 		return err
 	}
 
-	kubeClient, _, err := serverutil.GetKubeAndAggregatorClientset()
+	_, kubeClient, _, gpuClient, gpuPodClient, err := serverutil.GetKubeAndAggregatorClientset()
 	if err != nil {
 		return err
 	}
-
-	// Try to get tls ca after gpuserver is health, this will be blocked until get cacert.
-	cacert := serverdsutil.EnsureGetCaFromSecrets(kubeClient)
 
 	pw, err := controller.NewPodWatcher(kubeClient, stop)
 	if err != nil {
@@ -44,8 +37,7 @@ func runserverds(sflags *options.MetricsPodResourceDSFlags) (err error) {
 		return err
 	}
 
-	//start HealthChecker controller every second
-	notheathChan := hc.CheckHealth(options.HealthChecker_CheckHealthInterval)
+	controller.StartLeaseControllerErrExit(stopCtx, kubeClient, gpuClient)
 
 	//start HostGpuInfoChecker controller
 	err = gic.Start()
@@ -53,14 +45,14 @@ func runserverds(sflags *options.MetricsPodResourceDSFlags) (err error) {
 		return err
 	}
 
-	dsc, err := controller.NewServerDSController(cacert, pw.GetSyncChan(), pw.GetRemoveChan(), notheathChan,
-		gic.GetGpuInfoChan(), hc, sflags.LocalPodResourcesEndpoint, stop)
+	dsc, err := controller.NewServerDSController(stop, pw.GetSyncChan(), pw.GetRemoveChan(),
+		gic.GetGpuInfoChan(), sflags.LocalPodResourcesEndpoint, gpuClient, gpuPodClient)
 	if err != nil {
 		return err
 	}
 
 	//start ServerDSController controller
-	dsc.Start()
+	err = dsc.Start()
 	if err != nil {
 		return err
 	}

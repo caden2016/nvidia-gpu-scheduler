@@ -5,12 +5,16 @@ GOLANG_VERSION ?= 1.17.2
 BASE_DIST ?= ubuntu:21.10
 BASE_DIST_DS ?= caden/nvidia_k8s-device-plugin:v0.9.0
 
-PLUGIN_VERSION  ?= v0.1.0
+MAIN_VERSION  ?= v0.2.0
+COMMIT_DATE=$(shell git --no-pager log -1 --format='%cI')
+COMMIT_ID=$(shell git rev-parse --short HEAD)
+PLUGIN_VERSION=$(MAIN_VERSION)-$(COMMIT_ID)-$(COMMIT_DATE)
+
 REGISTRY ?= docker.io/caden
 IMAGE_NAME := $(REGISTRY)/gpuserver
-OUT_IMAGE = $(IMAGE_NAME):$(PLUGIN_VERSION)
+OUT_IMAGE = $(IMAGE_NAME):$(MAIN_VERSION)
 IMAGE_NAME_DS := $(REGISTRY)/gpuserver-ds
-OUT_IMAGE_DS = $(IMAGE_NAME_DS):$(PLUGIN_VERSION)
+OUT_IMAGE_DS = $(IMAGE_NAME_DS):$(MAIN_VERSION)
 
 IMAGE_TAR ?= nvidia-gpu-scheduler.img
 OUTPUT_DIR ?= _output/bin/
@@ -29,10 +33,11 @@ clean:
 	rm -rf $(OUTPUT_DIR)*
 
 build:
+	echo "commitID:${COMMIT_ID},commitDate:${COMMIT_DATE}"
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on \
-	go build -mod=vendor -ldflags="-s -w -X 'main.Version=${PLUGIN_VERSION}'" -o $(OUTPUT_DIR) ./cmd/gpuserver
+	go build -mod=vendor -ldflags="-s -w -X 'github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app.version=${PLUGIN_VERSION}'" -o $(OUTPUT_DIR) ./cmd/gpuserver
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on \
-	go build -mod=vendor -ldflags="-s -w -X 'main.Version=${PLUGIN_VERSION}'" -o $(OUTPUT_DIR) ./cmd/gpuserver-ds
+	go build -mod=vendor -ldflags="-s -w -X 'github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app.version=${PLUGIN_VERSION}'" -o $(OUTPUT_DIR) ./cmd/gpuserver-ds
 
 gpuserver:
 	$(DOCKER) rmi $(OUT_IMAGE) || true

@@ -2,14 +2,13 @@ package runtime
 
 import (
 	"context"
-	"fmt"
+	"reflect"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/scheduler/framework"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/scheduler/framework/nodeinfo"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	"reflect"
 )
 
 func NewFramework(r Registry) (framework.Framework, error) {
@@ -34,24 +33,17 @@ func NewFramework(r Registry) (framework.Framework, error) {
 	return fw, nil
 }
 
-func (fw *frameworkImpl) getExtensionPoints() []interface{} {
-	return []interface{}{
-		&fw.scorePlugins,
-		&fw.filterPlugins,
-	}
-}
-
 func addPluginList(pluginList interface{}, pluginsList []framework.Plugin) error {
 	plugins := reflect.ValueOf(pluginList).Elem()
 	pluginType := plugins.Type().Elem()
 
 	for _, pl := range pluginsList {
 		plName := pl.Name()
-		if !reflect.TypeOf(pl).Implements(pluginType) {
-			return fmt.Errorf("plugin %q does not extend %s plugin", plName, pluginType.Name())
+		if reflect.TypeOf(pl).Implements(pluginType) {
+			newPlugins := reflect.Append(plugins, reflect.ValueOf(pl))
+			plugins.Set(newPlugins)
+			klog.Infof("plugin %q implements %s plugin", plName, pluginType.Name())
 		}
-		newPlugins := reflect.Append(plugins, reflect.ValueOf(pl))
-		plugins.Set(newPlugins)
 	}
 	return nil
 }
@@ -64,9 +56,16 @@ type frameworkImpl struct {
 	scorePlugins  []framework.ScorePlugin
 }
 
-func (f *frameworkImpl) RunFilterPlugins(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, node string) *framework.Status {
+func (f *frameworkImpl) getExtensionPoints() []interface{} {
+	return []interface{}{
+		&f.scorePlugins,
+		&f.filterPlugins,
+	}
+}
+
+func (f *frameworkImpl) RunFilterPlugins(ctx context.Context, pod *corev1.Pod, node string) *framework.Status {
 	for _, filter := range f.filterPlugins {
-		status := filter.Filter(ctx, pod, nodeInfo, node)
+		status := filter.Filter(ctx, pod, node)
 		if !status.Accepted {
 			klog.Infof("Plugin[%s].Filter refused with Error: %v", filter.Name(), status.Err)
 			return status
@@ -76,7 +75,7 @@ func (f *frameworkImpl) RunFilterPlugins(ctx context.Context, pod *corev1.Pod, n
 	return &framework.Status{Accepted: true}
 }
 
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, nodes []string, parallelism int) extenderv1.HostPriorityList {
+func (f *frameworkImpl) RunScorePlugins(ctx context.Context, pod *corev1.Pod, nodes []string, parallelism int) extenderv1.HostPriorityList {
 	hpList := make(extenderv1.HostPriorityList, 0, len(nodes))
 	pluginToNodeScores := make(framework.PluginToHostPriorityList, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
@@ -85,7 +84,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, pod *corev1.Pod, no
 
 	workqueue.ParallelizeUntil(ctx, parallelism, len(nodes), func(i int) {
 		for _, pl := range f.scorePlugins {
-			score, status := pl.Score(ctx, pod, nodeInfo, nodes[i])
+			score, status := pl.Score(ctx, pod, nodes[i])
 			if !status.Accepted {
 				klog.Infof("Plugin[%s].Score %v", pl.Name(), status.Err)
 			}

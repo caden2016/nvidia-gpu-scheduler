@@ -9,5 +9,12 @@ rules:
       - pods
       - apiservices
       - secrets
+      - gpupods
+      - gpupods/status
+      - gpunodes
+      - gpunodes/status
+      - namespaces
+      - leases
+      - events
     verbs:
       - "*"

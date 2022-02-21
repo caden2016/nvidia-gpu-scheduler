@@ -3,11 +3,13 @@ package nameflag
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
+
+	"github.com/moby/term"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"io"
 	"k8s.io/klog"
-	"strings"
 )
 
 const usageFmt = "Usage:\n  %s\n"
@@ -39,16 +41,16 @@ func (nfs *NameFlagSet) AddNameFlagSetToCmd(cmd *cobra.Command) {
 
 func (nfs *NameFlagSet) SetUsageAndHelpFunc(cmd *cobra.Command) error {
 
-	//outFd, isTerminal := term.GetFdInfo(cmd.OutOrStdout())
-	//if !isTerminal {
-	//	return fmt.Errorf("given writer is no terminal")
-	//}
-	//winsize, err := term.GetWinsize(outFd)
-	//if err != nil {
-	//	return err
-	//}
+	outFd, isTerminal := term.GetFdInfo(cmd.OutOrStdout())
+	if !isTerminal {
+		return fmt.Errorf("given writer is no terminal")
+	}
+	winsize, err := term.GetWinsize(outFd)
+	if err != nil {
+		return err
+	}
 
-	cols := 116 //int(winsize.Width) //start in container, set a constant
+	cols := int(winsize.Width)
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
 		printSections(cmd.OutOrStderr(), nfs, cols)

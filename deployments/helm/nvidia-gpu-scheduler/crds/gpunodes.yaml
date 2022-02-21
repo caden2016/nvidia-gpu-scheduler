@@ -1,0 +1,116 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: gpunodes.resources.scheduler.caden2016.github.io
+spec:
+  group: resources.scheduler.caden2016.github.io
+  names:
+    kind: GpuNode
+    listKind: GpuNodeList
+    plural: gpunodes
+    singular: gpunode
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - description: The status of node.
+          jsonPath: .status.health
+          name: HEATH
+          type: string
+        - description: The last healthy time of node.
+          jsonPath: .status.last_health_time
+          name: LastHealthyTime
+          type: string
+        - description: The last transition time of node status.
+          jsonPath: .status.last_transition_time
+          name: LastTransitionTime
+          type: string
+        - description: The status message of node.
+          jsonPath: .status.message
+          name: MESSAGE
+          type: string
+        - description: CreationTimestamp is a timestamp representing the server time when this object was created. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+          jsonPath: .metadata.creationTimestamp
+          name: AGE
+          type: date
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: GpuNode is the Schema for the gpunodes API
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: GpuNodeSpec defines the desired state of GpuNode
+              properties:
+                device_busy:
+                  description: NodeDeviceInUse defines the gpus which are used.
+                  items:
+                    type: string
+                  type: array
+                device_infos:
+                  additionalProperties:
+                    properties:
+                      device_brand:
+                        type: string
+                      device_busid:
+                        type: string
+                      device_id:
+                        type: string
+                      device_model:
+                        type: string
+                      device_node:
+                        type: string
+                    type: object
+                  description: GpuInfos defines the observed state of gpu from each node.
+                  type: object
+                device_models:
+                  additionalProperties:
+                    items:
+                      type: string
+                    type: array
+                  description: Models group the gpus by model.
+                  type: object
+                report_time:
+                  description: ReportTime record the time gpuinfo populated by each gpuserver-ds.
+                  format: date-time
+                  type: string
+              required:
+                - device_busy
+              type: object
+            status:
+              description: GpuNodeStatus defines the observed state of GpuNode. This will be updated with resource GpuNodeHealth.
+              properties:
+                health:
+                  type: string
+                last_health_time:
+                  format: date-time
+                  type: string
+                last_transition_time:
+                  format: date-time
+                  type: string
+                message:
+                  type: string
+                node:
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

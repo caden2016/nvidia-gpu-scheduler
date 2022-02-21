@@ -20,24 +20,27 @@ package app
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app/options"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/nameflag"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"os"
 
 	"github.com/spf13/viper"
 	"k8s.io/klog"
 )
 
 var cfgFile string
+var version string // This should be set at build time to indicate the actual version
 
 var rootCmd = &cobra.Command{
 	Use:   "gpuserver-ds",
-	Short: "Populate node gpu devices info to gpuserver.",
-	Long: `Populate node gpu devices info to gpuserver.
+	Short: "Report gpu devices info of each node to gpuserver.",
+	Long: `Report gpu devices info of each node to  gpuserver.
 - It gets pods used gpu device infos with the help of kubelet grpc Server PodResourcesServer.
-- It gets gpu device infos with the help of NVML.`,
+- It gets gpu device infos with the help of NVML.
+- It reports gpu pods and gpu nodes info through crd.`,
 
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		mprdsflags := &options.MetricsPodResourceDSFlags{}
@@ -57,7 +60,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func Execute(version string) {
+func Execute() {
 	rootCmd.Version = version
 	cobra.CheckErr(rootCmd.Execute())
 }
@@ -106,7 +109,6 @@ func setServerFlags(nfs *nameflag.NameFlagSet) error {
 	serverPFlags.StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.metrics-podresource.yaml)")
 	serverPFlags.String("write-config-to", "", "If set, write the configuration values to this file and exit.")
 	serverPFlags.String("localPodResourcesEndpoint", options.DefaultPodResourcesEndpoint, "localPodResourcesEndpoint is the path to the local kubelet endpoint serving the podresources GRPC service.")
-	serverPFlags.Duration("interval-wait-service", options.HealthyChecker_WaitForServiceInterval, "Interval Time to check if the server is healthy.")
 	return nfs.AddFlagSet("server-ds", serverPFlags)
 }
 

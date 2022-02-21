@@ -17,19 +17,19 @@
 ## 特征和组件
 ### 特征
 - 实时数据采集。（gpuserver都会采集最新的数据，不管gpuserver故障重启或各个节点上的gpuserver-ds故障重启。）
-- 实时健康检测。（gpuserver通过gpuserver-ds的探针通知，及时得知每个节点的健康状况。）
-- 调度扩展点：Filter,Score,Preempt。（对请求pod注解包含 `nvidia.com/gpu.model`，过滤不符合gpu类型的节点。对每种gpu类型的节点按照gpu个数打分进行优选。）
+- 实时健康检测。（gpuserver的gpunode-lifecycle-controller模块通过gpuserver-ds的租约更新及时得知每个节点的健康状况。）
+- 调度扩展点：Filter,Score,Preempt。（对请求pod注解包含 `nvidia-gpu-scheduler/gpu.model`， 过滤不符合gpu类型的节点。对每种gpu类型的节点按照gpu个数打分进行优选。）
 ### 组件
 The NVIDIA device scheduler extender for Kubernetes contains a StatefulSet (gpuserver) and a Daemonset (gpuserver-ds):
 #### gpuserver
 提供以下接口来监控请求gpu的pod和gpu节点的信息：
-* GET /apis/metrics.nvidia.com/v1alpha1/podresources
-* GET /apis/metrics.nvidia.com/v1alpha1/podresources?watch=true
-* GET /apis/metrics.nvidia.com/v1alpha1/gpuinfos
+* GET /apis/nvidia-gpu-scheduler/v1/gpupods?watch=true
+* GET /apis/nvidia-gpu-scheduler/v1/gpunodes?watch=true
 
-- 帮助监控kubernetes集群内pod中使用gpu的容器情况。
-- 帮助监控kubernetes集群内各个节点gpu使用情况。
-- 通过APIService扩展kubernetes api。作为kubernetes HTTPExtender服务器，帮助调度不同gpu型号需求的pod。
+提供以下接口作为一个HTTPExtender扩展kubernetes的kube-scheduler：
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/filter
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/prioritize
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/preempt
 
 #### gpuserver-ds
 为gpuserver采集节点gpu信息。
@@ -57,7 +57,7 @@ $ cat kube-scheduler-config.yaml
 apiVersion: kubescheduler.config.k8s.io/v1alpha2
 ...
 extenders:
-  - urlPrefix: 'https://<kube-apiserver>:6443/apis/metrics.nvidia.com/v1alpha1/schedule'
+  - urlPrefix: 'https://<kube-apiserver>:6443/apis/nvidia-gpu-scheduler/v1/schedule'
     filterVerb: filter
     prioritizeVerb: prioritize
     preemptVerb: preempt
@@ -73,7 +73,7 @@ profiles:
 - schedulerName: default-scheduler
 ```
 3. ### 使用`helm`部署。
-当前`nvidia-gpu-scheduler`版本为`v0.1.0`。最好的安装方式是使用`helm`。
+当前`nvidia-gpu-scheduler`版本为`v0.2.0`。最好的安装方式是使用`helm`。
 
 `helm`的安装可以参考 [这里](https://helm.sh/docs/intro/install/) 。
 使用`helm`安装`nvidia-gpu-scheduler`的简单指导可以参考[这里](https://caden2016.github.io/nvidia-gpu-scheduler) 。
@@ -85,7 +85,7 @@ profiles:
 ```
 * 通过helm仓库安装指定版本应用。xxx为应用实例名称。nodeinfo=gpu为gpuserver-ds部署到gpu节点上的label。
 ```shell
-# helm install xxx ngs/nvidia-gpu-scheduler --version 0.1.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
+# helm install xxx ngs/nvidia-gpu-scheduler --version 0.2.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
 # helm  list --namespace kube-system
 ```
 ## 本地构建和运行

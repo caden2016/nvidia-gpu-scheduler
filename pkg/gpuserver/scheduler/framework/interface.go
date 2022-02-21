@@ -2,7 +2,7 @@ package framework
 
 import (
 	"context"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/scheduler/framework/nodeinfo"
+
 	corev1 "k8s.io/api/core/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
@@ -25,7 +25,7 @@ type Plugin interface {
 type FilterPlugin interface {
 	Plugin
 	// Filter is called by the scheduling framework.
-	Filter(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, node string) *Status
+	Filter(ctx context.Context, pod *corev1.Pod, node string) *Status
 }
 
 // ScorePlugin is an interface that must be implemented by "Score" plugins to rank
@@ -34,13 +34,13 @@ type ScorePlugin interface {
 	Plugin
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node.
-	Score(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, node string) (int64, *Status)
+	Score(ctx context.Context, pod *corev1.Pod, node string) (int64, *Status)
 }
 
 type PluginsRunner interface {
-	RunFilterPlugins(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, node string) *Status
+	RunFilterPlugins(ctx context.Context, pod *corev1.Pod, node string) *Status
 
-	RunScorePlugins(ctx context.Context, pod *corev1.Pod, nodeInfo *nodeinfo.NodeInfo, nodes []string, parallelism int) extenderv1.HostPriorityList
+	RunScorePlugins(ctx context.Context, pod *corev1.Pod, nodes []string, parallelism int) extenderv1.HostPriorityList
 }
 
 type Framework interface {

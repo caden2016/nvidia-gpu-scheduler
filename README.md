@@ -18,20 +18,19 @@ But in some case, our node have more gpu devices with different model, we wish k
 ## Features and Components
 ### Features
 - Real-time data acquisition.(Data will be published in time no matter the gpuserver is restart or the gpuserver-ds of each node is restarted.)
-- Health check in time. (the gpuserver notice the health of each node in time with the probe from the gpuserver-ds.)
-- Schedule ExtendPoint Filter,Score,Preempt.(Filter nodes with annotation `nvidia.com/gpu.model` of requested pod, scores by gpu numbers of the request model in each node.)
+- Health check in time. (the gpunode-lifecycle-controller in gpuserver check the health of each node in time with the fresh lease from the gpuserver-ds.)
+- Schedule ExtendPoint Filter,Score,Preempt.(Filter nodes with annotation `nvidia-gpu-scheduler/gpu.model` of requested pod, scores by gpu numbers of the request model in each node.)
 ### Components
 The NVIDIA device scheduler extender for Kubernetes contains a StatefulSet (gpuserver) and a Daemonset (gpuserver-ds):
 #### gpuserver
 Provide following apis to help monitor gpu pod and gpu node info:
-* GET /apis/metrics.nvidia.com/v1alpha1/podresources
-* GET /apis/metrics.nvidia.com/v1alpha1/podresources?watch=true
-* GET /apis/metrics.nvidia.com/v1alpha1/gpuinfos
+* GET /apis/nvidia-gpu-scheduler/v1/gpupods?watch=true
+* GET /apis/nvidia-gpu-scheduler/v1/gpunodes?watch=true
 
-- Help monitor which container of pod is using gpus in kubernetes.
-- Help monitor gpu info of each node in kubernetes.
-- Help schedule pod with different gpu model needed by extending kubernetes api through the APIService as a kubernetes HTTPExtender server.
-
+Provide following apis to help extend kubernetes kube-scheduler as a HTTPExtender:
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/filter
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/prioritize
+* POST /apis/nvidia-gpu-scheduler/v1/schedule/preempt
 
 #### gpuserver-ds
 Populate node gpu devices info to gpuserver.
@@ -59,7 +58,7 @@ $ cat kube-scheduler-config.yaml
 apiVersion: kubescheduler.config.k8s.io/v1alpha2
 ...
 extenders:
-  - urlPrefix: 'https://<kube-apiserver>:6443/apis/metrics.nvidia.com/v1alpha1/schedule'
+  - urlPrefix: 'https://<kube-apiserver>:6443/apis/nvidia-gpu-scheduler/v1/schedule'
     filterVerb: filter
     prioritizeVerb: prioritize
     preemptVerb: preempt
@@ -75,7 +74,7 @@ profiles:
 - schedulerName: default-scheduler
 ```
 3. ### Deploy with `helm`
-Current version of `nvidia-gpu-scheduler` is `v0.1.0`.
+Current version of `nvidia-gpu-scheduler` is `v0.2.0`.
 The preferred way to deploy it is using `helm`.
 
 Instructions for installing `helm` can be found [here](https://helm.sh/docs/intro/install/).
@@ -87,7 +86,7 @@ The simple guide for `helm with nvidia-gpu-scheduler repo` can be found [here](h
 ```
 * Install from chart repo，xxx is the release name. nodeinfo=gpu is the label of gpu node, where to deploy gpuserver-ds.
 ```shell
-# helm install xxx ngs/nvidia-gpu-scheduler --version 0.1.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
+# helm install xxx ngs/nvidia-gpu-scheduler --version 0.2.0 --namespace kube-system  --set nodeSelectorDaemonSet.nodeinfo=gpu
 # helm  list --namespace kube-system
 ```
 

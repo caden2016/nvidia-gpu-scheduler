@@ -4,12 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/controller"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/router"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
-	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"net/http"
 	"path"
 	"reflect"
@@ -17,6 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/controller"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/gpuserver/router"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
 type schedulerRouter struct {
@@ -71,7 +72,7 @@ func (sr *schedulerRouter) postScheduleFilterHandler(w http.ResponseWriter, r *h
 	nodeNum := len(*searg.NodeNames)
 	feasibleNodes := make([]string, nodeNum)
 	checkNode := func(i int) {
-		status := sr.controller.FW.RunFilterPlugins(context.TODO(), searg.Pod, sr.controller.FWNI, (*searg.NodeNames)[i])
+		status := sr.controller.FW.RunFilterPlugins(context.TODO(), searg.Pod, (*searg.NodeNames)[i])
 		if status.Accepted {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
 			feasibleNodes[length-1] = (*searg.NodeNames)[i]
@@ -101,7 +102,7 @@ func (sr *schedulerRouter) postSchedulePrioritizeHandler(w http.ResponseWriter, 
 	}
 	klog.Infof("Before schedule prioritize pod:%s/%s, annotation:%v ExtenderArgs nodes:%v", searg.Pod.Namespace, searg.Pod.Name, searg.Pod.Annotations, *(searg.NodeNames))
 
-	seresult = sr.controller.FW.RunScorePlugins(context.TODO(), searg.Pod, sr.controller.FWNI, *searg.NodeNames, sr.controller.GetParallelism())
+	seresult = sr.controller.FW.RunScorePlugins(context.TODO(), searg.Pod, *searg.NodeNames, sr.controller.GetParallelism())
 
 	klog.Infof("After schedule prioritize pod:%s/%s, HostPriority:%v", searg.Pod.Namespace, searg.Pod.Name, seresult)
 	if err := jencoder.Encode(seresult); err != nil {
@@ -134,7 +135,7 @@ func (sr *schedulerRouter) postSchedulePreemptHandler(w http.ResponseWriter, r *
 	nodeNum := len(searg.NodeNameToMetaVictims)
 	feasibleNodes := make([]string, nodeNum)
 	checkNode := func(i int) {
-		status := sr.controller.FW.RunFilterPlugins(context.TODO(), searg.Pod, sr.controller.FWNI, argNodeNames[i])
+		status := sr.controller.FW.RunFilterPlugins(context.TODO(), searg.Pod, argNodeNames[i])
 		if status.Accepted {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
 			feasibleNodes[length-1] = argNodeNames[i]

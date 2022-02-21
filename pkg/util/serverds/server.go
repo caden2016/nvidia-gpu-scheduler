@@ -2,15 +2,16 @@ package serverds
 
 import (
 	"context"
+	"time"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver-ds/app/options"
 	serveroptions "github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
-	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util"
+	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util/info/metadata"
 	"github.com/openkruise/kruise/pkg/webhook/util/writer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	"time"
 )
 
 // EnsureGetCaFromSecrets block until get the ca from secret
@@ -18,7 +19,7 @@ func EnsureGetCaFromSecrets(kubeclient kubernetes.Interface) (cacert []byte) {
 	var secret *corev1.Secret
 	var err error
 
-	name, namespace, _ := util.GetServiceCommonName()
+	name, namespace := metadata.MetadataName(), metadata.MetadataNamespace()
 	parentcxt, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 	tc := time.Tick(options.CaFromSecret_CheckInterval)

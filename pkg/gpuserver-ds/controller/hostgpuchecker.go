@@ -2,14 +2,15 @@ package controller
 
 import (
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/NVIDIA/go-nvml/pkg/nvml"
 	. "github.com/caden2016/nvidia-gpu-scheduler/api/jsonstruct"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/util"
 	serverdsutil "github.com/caden2016/nvidia-gpu-scheduler/pkg/util/serverds"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	"reflect"
-	"time"
 )
 
 func NewHostGpuInfoChecker(checkInterval time.Duration, stop <-chan struct{}) (*HostGpuInfoChecker, error) {

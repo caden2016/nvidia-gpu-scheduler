@@ -20,24 +20,28 @@ package app
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/caden2016/nvidia-gpu-scheduler/cmd/gpuserver/app/options"
 	"github.com/caden2016/nvidia-gpu-scheduler/pkg/nameflag"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"k8s.io/klog"
-	"os"
 )
 
 var cfgFile string
+var version string // This should be set at build time to indicate the actual version.
 
 var rootCmd = &cobra.Command{
 	Use:   "gpuserver",
 	Short: "Extend kubernetes api through the APIService as a kubernetes HTTPExtender server.",
 	Long: `Extend kubernetes api through the APIService as a kubernetes HTTPExtender server. Provide following apis:
-GET /apis/metrics.nvidia.com/v1alpha1/podresources
-GET /apis/metrics.nvidia.com/v1alpha1/podresources?watch=true
-GET /apis/metrics.nvidia.com/v1alpha1/gpuinfos 
+[monitor apis]
+GET /apis/nvidia-gpu-scheduler/v1/gpupods?watch=true
+GET /apis/nvidia-gpu-scheduler/v1/gpunodes?watch=true
+[scheduler apis]
+POST /apis/nvidia-gpu-scheduler/v1/schedule/filter,prioritize,preempt
 
 - Help monitor which container of pod is using gpus in kubernetes.
 - Help monitor gpu info of each node in kubernetes.
@@ -61,7 +65,7 @@ GET /apis/metrics.nvidia.com/v1alpha1/gpuinfos
 	},
 }
 
-func Execute(version string) {
+func Execute() {
 	rootCmd.Version = version
 	cobra.CheckErr(rootCmd.Execute())
 }
